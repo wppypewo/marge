@@ -16,9 +16,9 @@
   - [ ] 補「報告轉 PDF 並同步雲端」的腳本（目前每次手動；10-17、10-18、10-23 都遇到 Google Drive app 沒開，10-17 雲端版本被舊檔蓋回）
   - [ ] 寫 3 個 skill：報告更新並同步雲端、新模型批閱評測、供應商資料政策查證
   - [ ] 在 `CLAUDE.md` 路由表加上腳本與 skill 的位置
-- [ ] 你：決定 initial commit 的時間（目前檔案未提交）
-- [ ] 你：決定要不要建 GitHub remote（private 或 public）
-- [ ] 你：確認是否把 marge 記進工作區 `~/ClaudeCode/CLAUDE.md` 的 repo 清單與 `WORKSPACE_STATE.md`
+- [x] 你：initial commit（10-24，`238e4d0`）
+- [x] 建 GitHub remote：`zhuang060329-bit/marge`（private，10-24），`ls-remote` 驗證遠端 `main` = `238e4d0`
+- [x] 把 marge 記進工作區 `~/ClaudeCode/CLAUDE.md` 的 repo 清單與 `WORKSPACE_STATE.md`（10-24）
 - [ ] 你：寫信問老師 PRD 2.1「待問老師」的問題（OI-9）
 - [ ] 實測 Cerebras `qwen-3.8-27b`、Cloudflare Workers AI（OI-1），流程同報告 2.3
 - [ ] 跑修正版 prompt（OI-2）、同模型重跑一次（OI-3）
