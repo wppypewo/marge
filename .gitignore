@@ -1,1 +1,4 @@
 .DS_Store
+
+# run_bench.py 的輸出
+tools/bench/results/

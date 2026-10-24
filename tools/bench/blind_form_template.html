@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>盲評填寫表</title>
+<style>
+:root {
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --sunk: #eceef0;
+  --ink: #1b1d20;
+  --muted: #565b62;
+  --line: #d7dade;
+  --accent: #1f5fa8;
+  --ok: #1b7343;
+  --bad: #ad2a22;
+  --hl: #fbe7a6;
+  --radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141517; --surface: #1c1e21; --sunk: #25282c; --ink: #e8e9ea; --muted: #a4a9b0;
+    --line: #353940; --accent: #86b4ee; --ok: #72c695; --bad: #f2948b; --hl: #5c4a12;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141517; --surface: #1c1e21; --sunk: #25282c; --ink: #e8e9ea; --muted: #a4a9b0;
+  --line: #353940; --accent: #86b4ee; --ok: #72c695; --bad: #f2948b; --hl: #5c4a12;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.6 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+header {
+  position: sticky; top: 0; z-index: 2; background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.bar { max-width: 960px; margin: 0 auto; padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bar h1 { font-size: 16px; margin: 0; font-weight: 650; }
+.save { font-size: 13px; color: var(--muted); margin-left: auto; }
+.save.warn { color: var(--bad); }
+nav.tabs { max-width: 960px; margin: 0 auto; padding: 0 16px; display: flex; gap: 4px; overflow-x: auto; }
+nav.tabs button {
+  border: 0; background: none; padding: 8px 12px 10px; cursor: pointer; color: var(--muted);
+  border-bottom: 2px solid transparent; white-space: nowrap;
+}
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+nav.tabs .pct { font-size: 12px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+main { max-width: 960px; margin: 0 auto; padding: 20px 16px 80px; }
+h2 { font-size: 20px; margin: 32px 0 6px; }
+h2:first-child { margin-top: 0; }
+.hint { color: var(--muted); font-size: 14px; margin: 0 0 14px; max-width: 70ch; }
+.fr { font-family: inherit; }
+.item {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 10px;
+}
+.item.done { border-left: 3px solid var(--accent); }
+.item-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.num { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; min-width: 2.2em; }
+.target { font-size: 18px; font-weight: 650; }
+.reason { color: var(--muted); font-size: 14px; margin: 4px 0 10px; }
+.ctx { display: grid; grid-template-columns: 4.5em 1fr; gap: 2px 8px; font-size: 15px; margin-bottom: 12px; }
+.ctx dt { color: var(--muted); font-size: 13px; padding-top: 2px; }
+.ctx dd { margin: 0; }
+mark { background: var(--hl); color: inherit; padding: 0 2px; border-radius: 3px; }
+.note { font-size: 13px; color: var(--muted); background: var(--sunk); border-radius: var(--radius); padding: 4px 8px; display: inline-block; margin-bottom: 10px; }
+.q { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 8px; }
+.q > .lab { font-size: 14px; color: var(--muted); min-width: 4.5em; }
+.seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.opt {
+  border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius);
+  padding: 4px 12px; cursor: pointer; min-height: 34px;
+}
+.opt:hover { border-color: var(--muted); }
+.opt:active { transform: translateY(1px); }
+.opt:focus-visible, nav.tabs button:focus-visible, .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); font-weight: 600; }
+.opt.good[aria-pressed="true"] { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--surface)); color: var(--ok); }
+.opt.bad[aria-pressed="true"] { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--surface)); color: var(--bad); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { text-align: left; font-size: 14px; padding: 4px 10px; }
+.chip b { font-variant-numeric: tabular-nums; margin-right: 4px; }
+details.more { margin-top: 8px; }
+details.more summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+.more-body { margin-top: 8px; display: grid; gap: 10px; }
+.more-body .sent { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.picked { font-size: 13px; color: var(--muted); margin-top: 6px; }
+details.full { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px; margin-bottom: 16px; }
+details.full summary { cursor: pointer; font-weight: 600; }
+details.full p { margin: 8px 0; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; }
+.box p { margin: 0 0 6px; }
+label.field { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 4px; }
+textarea, input[type="text"] {
+  width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
+  padding: 8px 10px; min-height: 40px;
+}
+textarea { min-height: 72px; resize: vertical; }
+textarea:focus, input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.sum { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.sum th, .sum td { text-align: left; padding: 8px 12px; vertical-align: top; border-bottom: 1px solid var(--line); }
+.sum tr:last-child th, .sum tr:last-child td { border-bottom: 0; }
+.sum th { font-weight: 500; color: var(--muted); width: 40%; }
+.sum td { font-variant-numeric: tabular-nums; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.tool { border: 1px solid var(--accent); color: var(--accent); background: var(--surface); border-radius: var(--radius); padding: 6px 14px; cursor: pointer; }
+.tool.primary { background: var(--accent); color: var(--surface); }
+.grid { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--surface); }
+.grid th, .grid td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.grid td.c { text-align: center; white-space: nowrap; }
+.grid tr.sent-row td { background: var(--sunk); font-size: 14px; }
+.tag { font-size: 12px; padding: 1px 6px; border-radius: var(--radius); border: 1px solid currentColor; }
+.tag.w { color: var(--ok); } .tag.s { color: var(--muted); }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+@media (max-width: 640px) {
+  .ctx { grid-template-columns: 1fr; }
+  .ctx dt { padding-top: 6px; }
+  .q > .lab { min-width: 100%; }
+  .sum th { width: 50%; }
+  .bar { padding: 8px 16px 2px; }
+  .bar h1 { font-size: 15px; }
+  .save:not(.warn) { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>__TITLE__</h1>
+    <span class="save" id="save" role="status"></span>
+  </div>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+</header>
+<main id="main"></main>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<script type="application/json" id="data">/*__DATA__*/</script>
+<script>
+"use strict";
+const D = JSON.parse(document.getElementById("data").textContent);
+const KEY = "blindform:" + D.source + ":" + D.title;
+const MISJUDGE = "誤判";
+const ERR = {};           // E 編號 → {text, sent}
+D.sentences.forEach((s, i) => s.errors.forEach(e => { ERR[e.id] = { text: e.text, sent: i }; }));
+const ALL_E = Object.keys(ERR);
+const model = L => D.models.find(m => m.letter === L);
+
+function blank() {
+  const s = {};
+  for (const m of D.models) {
+    s[m.letter] = {
+      warn: m.warn.map(() => ({ ok: null, reason: null, errs: [] })),
+      silent: m.silent.map(() => ({ ok: null, errs: [] })),
+      marks: m.marks.map(() => ({ cat: null, use: null })),
+      wrong: "", level: "", b1keep: null, b1err: "", b2keep: null, b2err: "", format: ""
+    };
+  }
+  return s;
+}
+let S = blank();
+let canSave = true;
+try {
+  const raw = localStorage.getItem(KEY);
+  if (raw) S = merge(blank(), JSON.parse(raw));
+} catch (e) { canSave = false; }
+
+// 存檔內容的項目數和目前表單不一致時，只帶入對得上的部分
+function merge(base, saved) {
+  for (const L of Object.keys(base)) {
+    const b = base[L], s = saved && saved[L];
+    if (!s) continue;
+    for (const k of ["warn", "silent", "marks"]) {
+      (s[k] || []).forEach((v, i) => { if (b[k][i]) Object.assign(b[k][i], v); });
+    }
+    for (const k of ["wrong", "level", "b1keep", "b1err", "b2keep", "b2err", "format"]) {
+      if (s[k] !== undefined) b[k] = s[k];
+    }
+  }
+  return base;
+}
+
+let saveTimer = null;
+function save() {
+  const el = document.getElementById("save");
+  if (!canSave) { el.textContent = "這個瀏覽器不能自動儲存，填完請按「匯出 JSON」"; el.classList.add("warn"); return; }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(S));
+    el.textContent = "已自動儲存在這個瀏覽器";
+  } catch (e) {
+    canSave = false;
+    el.textContent = "自動儲存失敗，填完請按「匯出 JSON」";
+    el.classList.add("warn");
+  }
+}
+function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); }
+
+const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ---------- 完成度與小計 ----------
+function warnDone(r) { return r.ok && r.reason && r.errs.length > 0; }
+function silentDone(r) { return r.ok === "程式誤列" || (r.ok && r.errs.length > 0); }
+function markDone(r) { return r.cat && r.use; }
+function progress(L) {
+  const s = S[L];
+  const items = [...s.warn.map(warnDone), ...s.silent.map(silentDone), ...s.marks.map(markDone),
+    !!s.wrong.trim(), !!s.level.trim(), !!s.b1keep, !!s.b2keep, !!s.format.trim()];
+  return { done: items.filter(Boolean).length, total: items.length };
+}
+function summary(L) {
+  const s = S[L];
+  const caught = new Set(), silentFixed = new Set();
+  s.warn.forEach(r => r.errs.forEach(e => e !== MISJUDGE && caught.add(e)));
+  s.silent.forEach(r => r.ok !== "程式誤列" && r.errs.forEach(e => e !== MISJUDGE && silentFixed.add(e)));
+  const missed = ALL_E.filter(e => !caught.has(e));
+  const realSilent = s.silent.filter(r => r.ok && r.ok !== "程式誤列");
+  return {
+    misjudge: s.warn.filter(r => r.errs.includes(MISJUDGE)).length,
+    wrongFix: s.warn.filter(r => r.ok === "錯").length,
+    badReason: s.warn.filter(r => r.reason === "否").length,
+    caught: [...caught].sort(byE),
+    missed,
+    missedButFixed: missed.filter(e => silentFixed.has(e)),
+    silentReal: realSilent.length,
+    silentWrong: realSilent.filter(r => r.ok === "錯").length,
+    silentMisjudge: realSilent.filter(r => r.errs.includes(MISJUDGE)).length,
+    format: s.format,
+    keep: { B1: s.b1keep, B2: s.b2keep },
+    warnFilled: s.warn.filter(warnDone).length, warnTotal: s.warn.length
+  };
+}
+function byE(a, b) { return parseInt(a.slice(1)) - parseInt(b.slice(1)); }
+
+// ---------- 元件 ----------
+function seg(L, kind, i, field, values, cur) {
+  return `<span class="seg">${values.map(([v, cls]) =>
+    `<button type="button" class="opt ${cls || ""}" aria-pressed="${cur === v}" data-m="${L}" data-kind="${kind}" data-i="${i}" data-f="${field}" data-v="${esc(v)}">${esc(v)}</button>`
+  ).join("")}</span>`;
+}
+function chip(L, kind, i, id, picked, withText) {
+  const text = id === MISJUDGE ? "學生原本沒錯，被改掉" : ERR[id].text;
+  return `<button type="button" class="opt chip ${id === MISJUDGE ? "bad" : ""}" aria-pressed="${picked.includes(id)}" data-m="${L}" data-kind="${kind}" data-i="${i}" data-e="${esc(id)}"><b>${esc(id)}</b>${withText ? esc(text) : ""}</button>`;
+}
+function errPicker(L, kind, i, sents, picked) {
+  const quick = sents.flatMap(si => D.sentences[si].errors.map(e => e.id));
+  const quickHtml = quick.map(id => chip(L, kind, i, id, picked, true)).join("");
+  const label = sents.length ? "其他句子的編號" : "選編號";
+  return `<div class="chips">${quickHtml}${chip(L, kind, i, MISJUDGE, picked, true)}</div>
+    <details class="more" data-m="${L}" data-kind="${kind}" data-i="${i}"><summary>${label}</summary><div class="more-body"></div></details>
+    <div class="picked" data-picked="${L}-${kind}-${i}">${pickedText(picked, quick)}</div>`;
+}
+function pickedText(picked, quick) {
+  const extra = picked.filter(e => e !== MISJUDGE && !quick.includes(e));
+  return extra.length ? "另外選了：" + extra.sort(byE).join("、") : "";
+}
+function moreBody(L, kind, i) {
+  const picked = S[L][kind][i].errs;
+  return D.sentences.map((s, si) => s.errors.length ? `<div><div class="sent">第 ${esc(s.para)} 段：${esc(s.text)}</div>
+    <div class="chips">${s.errors.map(e => chip(L, kind, i, e.id, picked, true)).join("")}</div></div>` : "").join("");
+}
+function sentText(si) { return si === null || si === undefined ? "" : D.sentences[si].text; }
+
+// ---------- 各頁 ----------
+function viewModel(L) {
+  const m = model(L), s = S[L];
+  let h = `<details class="full"><summary>模型 ${L} 批改後的完整原文</summary>${m.annotated.map(p => `<p class="fr">${esc(p)}</p>`).join("")}</details>`;
+
+  h += `<h2>1. ⚠️ 逐條判斷（${m.warn.length} 條）</h2>
+    <p class="hint">「改得對」看改完的寫法對不對；「理由合理」看理由說不說得通；「對應錯誤」點這個 ⚠️ 處理到的錯誤編號，可以點多個。學生原本沒錯、被改成別的寫法，點「誤判」。</p>`;
+  m.warn.forEach((w, i) => {
+    const r = s.warn[i];
+    const student = sentText(w.sent);
+    const same = w.hl && student.includes(w.hl);
+    h += `<div class="item ${warnDone(r) ? "done" : ""}" data-item="${L}-warn-${i}">
+      <div class="item-head"><span class="num">#${i + 1}</span><span class="target fr">${esc(w.target)}</span></div>
+      <div class="reason fr">${esc(w.reason)}</div>
+      <dl class="ctx">
+        <dt>模型</dt><dd class="fr">${w.hl ? `${esc(w.pre)}<mark>${esc(w.hl)}</mark>${esc(w.post)}` : "（原文裡找不到這個標記的位置）"}</dd>
+        <dt>學生</dt><dd class="fr">${esc(student) || "（對不到學生的句子）"}</dd>
+      </dl>
+      ${same ? `<div class="note">標記的字在學生原句裡原樣出現：模型可能只標出、沒有改寫</div>` : ""}
+      <div class="q"><span class="lab">改得對</span>${seg(L, "warn", i, "ok", [["對", "good"], ["錯", "bad"]], r.ok)}
+        <span class="lab">理由合理</span>${seg(L, "warn", i, "reason", [["是", "good"], ["否", "bad"]], r.reason)}</div>
+      <div class="q"><span class="lab">對應錯誤</span></div>
+      ${errPicker(L, "warn", i, w.sent === null ? [] : [w.sent], r.errs)}
+    </div>`;
+  });
+
+  h += `<h2>2. 沒標 ⚠️ 就改掉的地方（${m.silent.length} 處）</h2>
+    <p class="hint">程式逐字比對列出來的，會有誤差。不是真的改動（比對錯位）就點「程式誤列」，其他照 ⚠️ 的方式填。</p>`;
+  if (!m.silent.length) h += `<div class="box">程式沒找到。</div>`;
+  m.silent.forEach((c, i) => {
+    const r = s.silent[i];
+    h += `<div class="item ${silentDone(r) ? "done" : ""}" data-item="${L}-silent-${i}">
+      <div class="item-head"><span class="num">${i + 1}</span><span class="target fr">${esc(c.from)} → ${esc(c.to)}</span></div>
+      <dl class="ctx">${c.sents.slice(0, 2).map(si => `<dt>學生</dt><dd class="fr">${esc(D.sentences[si].text)}</dd>`).join("") || `<dt>學生</dt><dd>（程式定位不到是哪一句，請看上方完整原文）</dd>`}</dl>
+      <div class="q"><span class="lab">改得對</span>${seg(L, "silent", i, "ok", [["對", "good"], ["錯", "bad"], ["程式誤列", ""]], r.ok)}</div>
+      <div class="q"><span class="lab">對應錯誤</span></div>
+      ${errPicker(L, "silent", i, c.sents, r.errs)}
+    </div>`;
+  });
+
+  h += `<h2>3. ☑️／✅ 標記（${m.marks.length} 個）</h2>
+    <p class="hint">☑️ 應該只標 7 個必用句型，✅ 應該只標選用詞彙。字尾有「…」的是沒加方括號的標記，只取了後面幾個字，請看完整原文。</p>`;
+  m.marks.forEach((k, i) => {
+    const r = s.marks[i];
+    h += `<div class="item ${markDone(r) ? "done" : ""}" data-item="${L}-marks-${i}">
+      <div class="item-head"><span class="num">${esc(k.label)}</span><span class="target fr">${esc(k.word)}</span></div>
+      <div class="q"><span class="lab">類別標對</span>${seg(L, "marks", i, "cat", [["是", "good"], ["否", "bad"]], r.cat)}
+        <span class="lab">用法對</span>${seg(L, "marks", i, "use", [["是", "good"], ["否", "bad"]], r.use)}</div>
+    </div>`;
+  });
+
+  h += `<h2>4. 優點與缺點</h2>
+    <div class="box"><p><strong>優點</strong></p>${m.strengths.map(t => `<p class="fr">${esc(t)}</p>`).join("")}
+    <p style="margin-top:12px"><strong>缺點</strong></p>${m.weaknesses.map(t => `<p class="fr">${esc(t)}</p>`).join("")}
+    <label class="field" for="wrong-${L}">說錯的地方（沒有就寫「無」）</label>
+    <textarea id="wrong-${L}" data-m="${L}" data-text="wrong">${esc(s.wrong)}</textarea>
+    <label class="field" for="level-${L}">說明的法文是不是 B1 程度</label>
+    <textarea id="level-${L}" data-m="${L}" data-text="level">${esc(s.level)}</textarea></div>`;
+
+  h += `<h2>5. 優化版本</h2>
+    <details class="full"><summary>學生原文（對照用）</summary>${studentFull()}</details>`;
+  for (const [key, text] of [["b1", m.b1], ["b2", m.b2]]) {
+    h += `<div class="box"><p><strong>${key.toUpperCase()} 優化版本</strong></p><p class="fr">${esc(text)}</p>
+      <div class="q"><span class="lab">沿用學生用詞</span>${seg(L, "top", 0, key + "keep", [["多數沿用"], ["部分"], ["大多換掉"]], s[key + "keep"])}</div>
+      <label class="field" for="${key}err-${L}">優化版本本身的錯誤（沒有就寫「無」）</label>
+      <textarea id="${key}err-${L}" data-m="${L}" data-text="${key}err">${esc(s[key + "err"])}</textarea></div>`;
+  }
+
+  h += `<h2>6. 小計</h2><p class="hint">上面填的會自動算進來；格式一欄自己寫。</p>
+    <div id="sum-${L}">${sumTable(L)}</div>
+    <label class="field" for="format-${L}">格式（標題繁中、說明 B1 法文）</label>
+    <input type="text" id="format-${L}" data-m="${L}" data-text="format" value="${esc(s.format)}">`;
+  return h;
+}
+function studentFull() {
+  const paras = {};
+  D.sentences.forEach(s => { (paras[s.para] = paras[s.para] || []).push(s.text); });
+  return Object.values(paras).map(p => `<p class="fr">${esc(p.join(" "))}</p>`).join("");
+}
+function sumTable(L) {
+  const x = summary(L);
+  const list = a => a.length ? a.join("、") : "無";
+  return `<table class="sum">
+    <tr><th>⚠️ 已填完</th><td>${x.warnFilled} / ${x.warnTotal}</td></tr>
+    <tr><th>誤判（把對的改錯）</th><td>${x.misjudge}</td></tr>
+    <tr><th>⚠️ 改完還是錯</th><td>${x.wrongFix}</td></tr>
+    <tr><th>理由不合理的 ⚠️</th><td>${x.badReason}</td></tr>
+    <tr><th>⚠️ 標到的錯誤</th><td>${x.caught.length} / ${ALL_E.length}</td></tr>
+    <tr><th>漏掉的錯誤（沒被 ⚠️ 標到）</th><td>${x.missed.length} 個：${list(x.missed)}</td></tr>
+    <tr><th>其中沒標 ⚠️ 但有改到</th><td>${list(x.missedButFixed)}</td></tr>
+    <tr><th>沒標 ⚠️ 的改動（真的改了的處數）</th><td>${x.silentReal}（改錯 ${x.silentWrong}，誤判 ${x.silentMisjudge}）</td></tr>
+    <tr><th>優化版本沿用學生用詞</th><td>B1：${x.keep.B1 || "未填"}；B2：${x.keep.B2 || "未填"}</td></tr>
+  </table>`;
+}
+
+function viewErrors() {
+  let h = `<h2>錯誤清單（E1～E${ALL_E.length}）</h2>
+    <p class="hint">10-17 定稿的答案卷，唯讀。右邊三欄會隨你填的內容更新：「⚠️」是被 ⚠️ 標到，「改」是沒標 ⚠️ 但改到了。</p>
+    <div class="scroll"><table class="grid"><thead><tr><th>編號</th><th>錯的字 → 正確寫法</th>${D.models.map(m => `<th>${m.letter}</th>`).join("")}</tr></thead><tbody>`;
+  const maps = D.models.map(m => {
+    const w = new Set(), s = new Set();
+    S[m.letter].warn.forEach(r => r.errs.forEach(e => w.add(e)));
+    S[m.letter].silent.forEach(r => r.ok !== "程式誤列" && r.errs.forEach(e => s.add(e)));
+    return { w, s };
+  });
+  D.sentences.forEach(sent => {
+    h += `<tr class="sent-row"><td colspan="${2 + D.models.length}"><span class="fr">第 ${esc(sent.para)} 段：${esc(sent.text)}</span></td></tr>`;
+    sent.errors.forEach(e => {
+      h += `<tr><td>${e.id}</td><td>${esc(e.text)}</td>${maps.map(x =>
+        `<td class="c">${x.w.has(e.id) ? '<span class="tag w">⚠️</span>' : x.s.has(e.id) ? '<span class="tag s">改</span>' : ""}</td>`).join("")}</tr>`;
+    });
+  });
+  return h + `</tbody></table></div>`;
+}
+
+function viewResult() {
+  let h = `<h2>結果與匯出</h2>
+    <p class="hint">填寫內容自動存在這個瀏覽器（換瀏覽器或清除網站資料就會不見）。填完按「匯出 JSON」，把下載的檔案放回專案資料夾交給 Claude 彙整。換電腦繼續填時用「匯入 JSON」。</p>
+    <div class="tools"><button type="button" class="tool primary" data-tool="export">匯出 JSON</button>
+    <button type="button" class="tool" data-tool="import">匯入 JSON</button></div>
+    <div class="scroll"><table class="grid"><thead><tr><th>項目</th>${D.models.map(m => `<th>${m.letter}</th>`).join("")}</tr></thead><tbody>`;
+  const xs = D.models.map(m => ({ L: m.letter, x: summary(m.letter), p: progress(m.letter) }));
+  const row = (name, f) => `<tr><td>${name}</td>${xs.map(o => `<td>${f(o)}</td>`).join("")}</tr>`;
+  h += row("完成度", o => `${o.p.done} / ${o.p.total}`);
+  h += row("誤判", o => o.x.misjudge);
+  h += row("⚠️ 改完還是錯", o => o.x.wrongFix);
+  h += row("理由不合理的 ⚠️", o => o.x.badReason);
+  h += row("⚠️ 標到的錯誤", o => `${o.x.caught.length} / ${ALL_E.length}`);
+  h += row("漏掉的錯誤", o => o.x.missed.length);
+  h += row("沒標 ⚠️ 的真改動", o => o.x.silentReal);
+  h += row("格式", o => esc(o.x.format) || "未填");
+  h += row("B1 沿用學生用詞", o => o.x.keep.B1 || "未填");
+  h += row("B2 沿用學生用詞", o => o.x.keep.B2 || "未填");
+  return h + `</tbody></table></div><p class="hint" style="margin-top:12px">哪個字母是哪個模型在另一個對照檔，全部填完、匯出之後再打開。</p>`;
+}
+
+// ---------- 分頁 ----------
+const TABS = [["errors", "錯誤清單"], ...D.models.map(m => [m.letter, "模型 " + m.letter]), ["result", "結果"]];
+function current() { const h = decodeURIComponent(location.hash.slice(1)); return TABS.some(t => t[0] === h) ? h : D.models[0].letter; }
+function renderTabs() {
+  const cur = current();
+  document.getElementById("tabs").innerHTML = TABS.map(([id, name]) => {
+    let pct = "";
+    if (model(id)) { const p = progress(id); pct = `<span class="pct">${p.done}/${p.total}</span>`; }
+    return `<button type="button" role="tab" aria-selected="${id === cur}" data-tab="${id}">${esc(name)}${pct}</button>`;
+  }).join("");
+}
+function render() {
+  const cur = current();
+  const main = document.getElementById("main");
+  main.innerHTML = cur === "errors" ? viewErrors() : cur === "result" ? viewResult() : viewModel(cur);
+  renderTabs();
+}
+function refreshAfter(L, kind, i) {
+  if (kind !== "top") {
+    const item = document.querySelector(`[data-item="${L}-${kind}-${i}"]`);
+    const r = S[L][kind][i];
+    const done = kind === "warn" ? warnDone(r) : kind === "silent" ? silentDone(r) : markDone(r);
+    if (item) item.classList.toggle("done", !!done);
+  }
+  const sum = document.getElementById("sum-" + L);
+  if (sum) sum.innerHTML = sumTable(L);
+  renderTabs();
+  saveSoon();
+}
+
+document.addEventListener("click", ev => {
+  const tab = ev.target.closest("[data-tab]");
+  if (tab) { location.hash = tab.dataset.tab; return; }
+  const tool = ev.target.closest("[data-tool]");
+  if (tool) { tool.dataset.tool === "export" ? exportJson() : document.getElementById("importFile").click(); return; }
+  const b = ev.target.closest("button.opt");
+  if (!b) return;
+  const L = b.dataset.m, kind = b.dataset.kind, i = +b.dataset.i;
+  if (b.dataset.e) {
+    const r = S[L][kind][i], id = b.dataset.e;
+    if (r.errs.includes(id)) r.errs = r.errs.filter(e => e !== id);
+    else r.errs = id === MISJUDGE ? [MISJUDGE] : [...r.errs.filter(e => e !== MISJUDGE), id];
+    const row = b.closest(".item");
+    row.querySelectorAll("button.chip").forEach(c => c.setAttribute("aria-pressed", r.errs.includes(c.dataset.e)));
+    const quick = [...row.querySelectorAll(":scope > .chips button.chip")].map(c => c.dataset.e);
+    row.querySelector("[data-picked]").textContent = pickedText(r.errs, quick);
+  } else {
+    const f = b.dataset.f, v = b.dataset.v;
+    const target = kind === "top" ? S[L] : S[L][kind][i];
+    target[f] = target[f] === v ? null : v;
+    b.parentElement.querySelectorAll("button.opt").forEach(o => o.setAttribute("aria-pressed", target[f] === o.dataset.v));
+  }
+  refreshAfter(L, kind, i);
+});
+document.addEventListener("toggle", ev => {
+  const d = ev.target;
+  if (!d.matches || !d.matches("details.more") || !d.open) return;
+  const body = d.querySelector(".more-body");
+  if (!body.innerHTML) body.innerHTML = moreBody(d.dataset.m, d.dataset.kind, +d.dataset.i);
+}, true);
+document.addEventListener("input", ev => {
+  const t = ev.target;
+  if (!t.dataset || !t.dataset.text) return;
+  S[t.dataset.m][t.dataset.text] = t.value;
+  refreshAfter(t.dataset.m, "top", 0);
+});
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+
+// ---------- 匯出、匯入 ----------
+function exportJson() {
+  const out = {
+    source: D.source, title: D.title, sig: D.sig, exported_at: new Date().toISOString(),
+    models: D.models.map(m => {
+      const s = S[m.letter];
+      return {
+        letter: m.letter,
+        warn: m.warn.map((w, i) => ({ n: i + 1, target: w.target, model_reason: w.reason,
+          ok: s.warn[i].ok, reason_ok: s.warn[i].reason, errs: s.warn[i].errs })),
+        silent: m.silent.map((c, i) => ({ from: c.from, to: c.to, ...s.silent[i] })),
+        marks: m.marks.map((k, i) => ({ label: k.label, word: k.word, ...s.marks[i] })),
+        notes: { 說錯的地方: s.wrong, 法文程度: s.level, 格式: s.format },
+        optimized: { B1: { keep: s.b1keep, errors: s.b1err }, B2: { keep: s.b2keep, errors: s.b2err } },
+        summary: summary(m.letter)
+      };
+    }),
+    state: S
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = D.source.replace(/\.md$/, "") + "_結果.json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+document.getElementById("importFile").addEventListener("change", ev => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.sig !== D.sig && !confirm("這個 JSON 不是從這份盲評表匯出的，項目可能對不上。還是要匯入嗎？")) return;
+      if (!confirm("匯入會取代這個瀏覽器裡目前填的內容，確定嗎？")) return;
+      S = merge(blank(), data.state);
+      save(); render();
+    } catch (e) { alert("讀不到這個檔案：" + e.message); }
+    ev.target.value = "";
+  };
+  reader.readAsText(file);
+});
+
+render();
+save();
+</script>
+</body>
+</html>
