@@ -14,8 +14,30 @@ Marge 是用免費或自己掌控的 AI 模型批閱學生手寫法文作文的�
 | 現行學生流程、Open Minis、skill 規劃 | `../local-first-ai/老師待辦_10-19_查證與規劃.md` |
 | 免費 API 供應商的資料政策與額度 | `../local-first-ai/盤點_十家免費API_10-23.md` |
 | C4-B1 批閱 prompt 原文與修正版 | `../local-first-ai/批閱prompts.md` |
-| 評測腳本（批閱、OCR 比對、盲評、自動檢查） | `../local-first-ai/bench/`（尚未搬進本 repo，見 `TASKS.md`） |
 | 評測期間的逐項紀錄 | `../local-first-ai/TASKS.md` |
+
+## 路由：要做某件事，用哪個 skill 或腳本
+
+腳本都在 `../local-first-ai/` 目錄下執行（`python3 -I ../marge/tools/...`），因為輸入與輸出都在那裡。每支腳本開頭有用法。
+
+| 要做的事 | skill | 腳本 |
+|---|---|---|
+| 改報告、重做 PDF、同步給老師的雲端資料夾 | `report-publish` | `tools/report/build_pdf.sh`（含 `md2html.py`）、`tools/report/sync_drive.sh` |
+| 測一個新模型或供應商的批閱表現 | `grading-eval` | `tools/bench/run_grading_local.py`（本機或 OpenAI 相容 API 跑三則流程） |
+| 比對 OCR 與參考轉寫、算字數 | `grading-eval` | `tools/bench/ocr_diff.py` |
+| 檢查批閱格式（⚠️ 數量、字數、標題） | `grading-eval` | `tools/bench/check_grading.py` |
+| 做盲評表、轉成可填的網頁、把結果寫回表格 | `grading-eval` | `tools/bench/make_blind_pack.py` → `make_blind_html.py`（模板 `blind_form_template.html`）→ `fill_blind_md.py` |
+| 查供應商免費層的條件、讀圖模型、資料去向 | `provider-policy-check` | 無（只查官方文件） |
+| 測模型速度（通用題目 T1～T6） | 無 | `tools/bench/run_bench.py`（題目在 `prompts.json`，結果寫到 `tools/bench/results/`，不進版控） |
+
+skill 在 `.claude/skills/<名稱>/SKILL.md`，只在本 repo 開的 session 自動載入；在 `../local-first-ai` 開 session 時，由那裡的 `CLAUDE.md` 指回這裡。
+
+`tools/bench/` 是 10-24 從 `../local-first-ai/bench/` 複製來的，之後改腳本以本 repo 為準；`local-first-ai` 裡的原檔保留，作為報告引用時的版本。
+
+環境變數：
+
+- `MARGE_EVIDENCE`：評測證據目錄，預設 `../local-first-ai`。`ocr_diff.py` 從這裡讀參考轉寫，`run_grading_local.py` 從這裡讀 prompt 與照片。
+- `MARGE_DRIVE_DIR`：雲端資料夾的掛載路徑。`sync_drive.sh` 預設用 glob 找，找到 0 個或多個時才要設。
 
 ## `../local-first-ai` 的關係
 
