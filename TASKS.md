@@ -20,7 +20,7 @@
   - [x] `CLAUDE.md` 加第二張路由表與環境變數；`.gitignore` 加 `tools/bench/results/`；`../local-first-ai/CLAUDE.md`（新檔）指回本 repo
 - [x] 你：commit、push 上面這批（10-24）
 - [x] 你：initial commit（10-24，`238e4d0`）
-- [x] 建 GitHub remote：`zhuang060329-bit/marge`（10-24 建立；同日為公開而重寫歷史，拿掉老師姓名與課名，重建為 public。舊歷史留在 private 的 `marge-old-private`、`marge-old-private-2`）
+- [x] 建 GitHub remote：`wppypewo/marge`（10-24 建立，10-25 帳號由 zhuang060329-bit 改名；同日為公開而重寫歷史，拿掉老師姓名與課名，重建為 public。舊歷史留在 private 的 `marge-old-private`、`marge-old-private-2`）
 - [x] 把 marge 記進工作區 `~/ClaudeCode/CLAUDE.md` 的 repo 清單與 `WORKSPACE_STATE.md`（10-24）
 - [ ] 你：寫信問老師 PRD 2.1「待問老師」的問題（OI-9）
 - [ ] 實測 Cerebras `qwen-3.8-27b`、Cloudflare Workers AI（OI-1），流程同報告 2.3
