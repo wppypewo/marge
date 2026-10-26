@@ -1,45 +1,58 @@
 # Marge
 
-用免費或自己掌控的 AI 模型，批閱學生的手寫法文作文。名稱取自法文 marge（頁邊），老師在作文旁寫批改的地方。
+English | [繁體中文](README.zh-TW.md)
 
-**階段：評測完成，產品還沒開始做。** 本 repo 放產品需求、決策紀錄和評測工具；學生端的 App 還不存在。
+Grading students' handwritten French essays with AI models that are free or under your own control. The name is French for *margin*, where a teacher writes corrections next to an essay.
 
-## 要解決的問題
+**Stage: evaluation done, product not started.** This repository holds the product requirements, the decision log and the evaluation tools; the student-facing app does not exist yet.
 
-一門法文寫作課的學生每週手寫一份短文，用老師提供的批閱 prompt 在 Gemini 上拍照、OCR、批閱。2026-10-09 起 Gemini 免費版把多數請求交給 Flash-Lite，批閱品質下降：同一份作文，prompt 規定 ⚠️ 少於 12 個，Flash-Lite 標了 28 個，而且只標位置、不寫改正形式。
+The documents are in Traditional Chinese.
 
-免費的替代模型多半要拿作文資料訓練。2026-10-16～10-23 的評測比較了：
+## The problem
 
-- Gemini 免費版與付費版
-- OpenRouter 上的 Nemotron 3.5 Super VL、dots
-- 本機的 Qwen3.6
+Students in a French writing course hand-write a short essay every week, then photograph it and run the teacher's grading prompt in Gemini: OCR first, then grading. Since 2026-10-09 the free Gemini tier routes most requests to Flash-Lite, and grading quality dropped. On the same essay, where the prompt allows fewer than 12 ⚠️ marks, Flash-Lite placed 28 and only marked positions without giving corrections.
 
-評測結果：品質最好的免費模型 Nemotron，要開啟「免費端點可用請求資料訓練」才能用。不必開這個選項的 dots，多數項目比不上 Nemotron。四項待定決策見 [PRD 第 3.2 節](PRD.md#32-待定決策)。
+Most free alternatives train on the essays they receive. An evaluation from 2026-10-16 to 10-23 compared the free and paid Gemini tiers, Nemotron 3.5 Super VL and dots on OpenRouter, and Qwen3.6 running locally.
 
-## 檔案
+## Evaluation summary
 
-| 檔案 | 內容 |
+| Model | Where it runs | Does it train on essays? | Result |
+|---|---|---|---|
+| Gemini free (Flash-Lite) | Google | — | 28 ⚠️ marks (limit: fewer than 12), positions only, no corrections; missed that the essay was over the word limit; B2 rewrite 116 words, under the 120 minimum |
+| Nemotron 3.5 Super VL | OpenRouter free endpoint | **Requires** opting in to "free endpoints may train on request data"; returns 404 otherwise | Best quality among free models; about 235 s per essay; quota about 7 essays a day |
+| dots | OpenRouter free endpoint | No opt-in needed | Below Nemotron on most items; its OCR "corrected" the student's mistakes the most (18 words off); about 325 s; needs an extra `oui` turn |
+| Qwen3.6 | Local machine | Data never leaves the computer | Needs 24 GB of memory; got the word count wrong in both runs |
+
+In short: the best free model costs the students their essays. Cerebras and Cloudflare Workers AI, whose official terms say they do not keep or train on data, have not been tested yet. Four open decisions (provider, student app, how the prompt is delivered, where results are stored) are in [PRD section 3.2](PRD.md#32-待定決策).
+
+Figures and their sources are in PRD sections 1.1, 3.1 and 3.2. The full evaluation report contains student essays and is not published (see below).
+
+## Files
+
+| File | Contents |
 |---|---|
-| [`PRD.md`](PRD.md) | 問題、目標用戶、功能需求 F1～F11、待定決策 D1～D4、ADR、Log、Open issues |
-| [`TASKS.md`](TASKS.md) | 進度與交接 |
-| [`CLAUDE.md`](CLAUDE.md) | 給 Claude Code 的路由表：什麼問題讀哪個檔、什麼工作用哪個 skill 或腳本 |
-| [`.claude/skills/`](.claude/skills/) | 三個重複出現的工作流程：更新報告並同步、評測新模型、查證供應商資料政策 |
-| [`tools/bench/`](tools/bench/) | 評測腳本：本機模型跑批閱流程、OCR 比對、批閱格式檢查、盲評表產生與回填 |
-| [`tools/report/`](tools/report/) | 報告轉 PDF、同步到 Google Drive |
+| [`PRD.md`](PRD.md) | Problem, target users, functional requirements F1–F11, open decisions D1–D4, ADRs, log, open issues |
+| [`docs/MAINTAINING.md`](docs/MAINTAINING.md) | Rules for updating the PRD and citing evidence, what each script is for, how this repository relates to the evidence folder |
+| [`tools/bench/`](tools/bench/) | Evaluation scripts: run the grading flow on a local model, compare OCR, check grading format, build and fill blind-review forms |
+| [`tools/report/`](tools/report/) | Turn the report into a PDF and sync it to Google Drive |
 
-## 評測證據不公開
+## Evaluation evidence is not public
 
-評測報告、模型回覆和 OCR 原文放在旁邊的 `../local-first-ai/` 目錄，裡面有學生作文，所以沒有放上 GitHub。PRD 裡指向 `../local-first-ai/` 的連結在 GitHub 上打不開，只有本機能用。
+The evaluation report, model replies and raw OCR live in a sibling folder, `../local-first-ai/`. It contains student essays, so it is not on GitHub. Links in the PRD that point to `../local-first-ai/` only work locally.
 
-## 工具用法
+## Using the tools
 
-Python 腳本只用標準函式庫。`build_pdf.sh` 用 Google Chrome 無頭模式列印 PDF，`sync_drive.sh` 需要 Google Drive 電腦版，兩者都只在 macOS 上測過。各腳本開頭有用法。在證據目錄執行：
+The Python scripts use only the standard library. `build_pdf.sh` prints the PDF with headless Google Chrome and `sync_drive.sh` needs Google Drive for desktop; both have only been tested on macOS. Usage is at the top of each script. Run them from the evidence folder:
 
 ```bash
-# 比對 OCR 與參考轉寫
-python3 -I ../marge/tools/bench/ocr_diff.py OCR_模型名.txt
-# 檢查批閱格式（⚠️ 數量、字數、7 段標題）
-python3 -I ../marge/tools/bench/check_grading.py 回覆_模型名.txt
+# Compare OCR output with the reference transcription
+python3 -I ../marge/tools/bench/ocr_diff.py OCR_<model>.txt
+# Check grading format (number of ⚠️ marks, word counts, the seven section headings)
+python3 -I ../marge/tools/bench/check_grading.py reply_<model>.txt
 ```
 
-證據目錄預設是 `../local-first-ai`，可用環境變數 `MARGE_EVIDENCE` 改。
+The evidence folder defaults to `../local-first-ai`; set `MARGE_EVIDENCE` to change it.
+
+## License
+
+[MIT](LICENSE), covering the code and documents in this repository.
