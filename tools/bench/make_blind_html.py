@@ -192,6 +192,13 @@ def parse_pack(md):
     return {"title": title, "sentences": sentences, "models": models}
 
 
+def signature(data):
+    """項目簽章：匯入 JSON 時用來確認是不是同一份盲評表。"""
+    items = [[w["target"] for w in m["warn"]] + [s["from"] for s in m["silent"]]
+             + [k["word"] for k in m["marks"]] for m in data["models"]]
+    return hashlib.sha256(json.dumps(items, ensure_ascii=False).encode()).hexdigest()[:12]
+
+
 def main():
     parser = argparse.ArgumentParser(description="盲評表 Markdown → 可填寫的 HTML")
     parser.add_argument("pack", type=Path, help="盲評表 .md")
@@ -202,10 +209,7 @@ def main():
     if args.out.exists() and not args.force:
         sys.exit(f"{args.out} 已經存在，不覆寫（確定要重產再加 --force）")
     data = parse_pack(args.pack.read_text(encoding="utf-8"))
-    # 項目簽章：匯入 JSON 時用來確認是不是同一份盲評表
-    items = [[w["target"] for w in m["warn"]] + [s["from"] for s in m["silent"]]
-             + [k["word"] for k in m["marks"]] for m in data["models"]]
-    data["sig"] = hashlib.sha256(json.dumps(items, ensure_ascii=False).encode()).hexdigest()[:12]
+    data["sig"] = signature(data)
     data["source"] = args.pack.name
 
     template = (Path(__file__).resolve().parent / "blind_form_template.html").read_text(encoding="utf-8")

@@ -170,6 +170,8 @@ def main():
     parser.add_argument("--key", type=Path, required=True, help="對照檔檔名")
     args = parser.parse_args()
 
+    if args.out.resolve() == args.key.resolve():
+        parser.error("--out 和 --key 不能是同一個檔")
     if args.out.exists() or args.key.exists():
         sys.exit("輸出檔已經存在，不覆寫")
     files = list(args.files)
@@ -197,8 +199,9 @@ def main():
     key += [f"| {letter} | {path.name} |" for letter, path in zip(letters, files)]
     key.append("")
 
-    write_new(args.out, pack)
+    # 先寫對照：萬一第二個檔寫不成，留下的是對照而不是無從還原的盲評表
     write_new(args.key, key)
+    write_new(args.out, pack)
     print(f"已產生 {args.out} 和 {args.key}（{len(files)} 個模型）")
 
 
