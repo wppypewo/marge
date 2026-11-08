@@ -6,6 +6,7 @@ LM Studio、Ollama、OpenRouter、Open WebUI 都提供這種 API。
 """
 import argparse
 import csv
+import http.client
 import json
 import os
 import re
@@ -166,6 +167,7 @@ def main():
         "",
     ]
     rows = []
+    stopped = False
     for t in tests:
         print(f"[{t['id']}] {t['name']} ...", end=" ", flush=True)
         row = {
@@ -175,6 +177,12 @@ def main():
         try:
             r = stream_chat(base_url, args.model, t["prompt"], api_key,
                             args.max_tokens, args.timeout)
+        except KeyboardInterrupt:
+            # 中途按 Ctrl-C：停在這題，已跑完的題目照樣寫出
+            print("中斷")
+            md += [f"## {t['id']} {t['name']}", "", "錯誤：手動中斷，後面的題目沒有跑", ""]
+            stopped = True
+            break
         except urllib.error.HTTPError as e:
             msg = f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}"
             print(msg)
@@ -182,7 +190,10 @@ def main():
             rows.append(row)
             md += [f"## {t['id']} {t['name']}", "", f"錯誤：{msg}", ""]
             continue
-        except (urllib.error.URLError, RuntimeError, TimeoutError, OSError) as e:
+        # ValueError 包含串流裡格式壞掉的 JSON 與非 UTF-8 位元組；
+        # HTTPException 包含連線中途斷掉的 IncompleteRead。單題失敗不中斷整輪。
+        except (urllib.error.URLError, RuntimeError, TimeoutError, OSError,
+                ValueError, http.client.HTTPException) as e:
             print(f"失敗：{e}")
             row["錯誤"] = str(e)
             rows.append(row)
@@ -228,6 +239,8 @@ def main():
             writer.writeheader()
         writer.writerows(rows)
     print(f"\n回答全文：{md_path}\n速度彙整：{csv_path}")
+    if stopped:
+        sys.exit(130)
 
 
 if __name__ == "__main__":

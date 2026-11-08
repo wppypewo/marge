@@ -65,6 +65,7 @@ def indent(l):
 
 
 LIST_RE = re.compile(r'^( *)([-*]|\d+\.) (.*)$')
+HEADING_RE = re.compile(r'^(#{1,4}) (.*)$')
 
 
 def parse_list(lines, i, base):
@@ -140,7 +141,7 @@ def convert(md):
             i += 1
             out.append('<pre><code>' + html.escape('\n'.join(code)) + '</code></pre>')
             continue
-        m = re.match(r'^(#{1,4}) (.*)$', l)
+        m = HEADING_RE.match(l)
         if m:
             lv, text = len(m.group(1)), m.group(2)
             hid = 'h%d' % len(toc)
@@ -175,8 +176,10 @@ def convert(md):
             out.append(h)
             continue
         para = []
-        while i < len(lines) and lines[i].strip() and not lines[i].startswith(('|', '#', '```')) \
-                and not LIST_RE.match(lines[i]):
+        # 只排除真正的標題行；「#5」「##### 五級」這類行不是標題，要當成段落文字，
+        # 否則第一行就被排除、i 不前進，會無限迴圈
+        while i < len(lines) and lines[i].strip() and not lines[i].startswith(('|', '```')) \
+                and not HEADING_RE.match(lines[i]) and not LIST_RE.match(lines[i]):
             para.append(lines[i].strip())
             i += 1
         out.append('<p>' + inline(' '.join(para)) + '</p>')
@@ -207,4 +210,5 @@ def main():
     open(dst, 'w', encoding='utf-8').write(doc)
 
 
-main()
+if __name__ == '__main__':
+    main()

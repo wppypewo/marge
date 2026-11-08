@@ -16,6 +16,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from make_blind_html import parse_pack, signature  # noqa: E402
+
 MISREAD = "程式誤列"
 
 
@@ -131,9 +134,17 @@ def main():
     if args.out.exists() and not args.force:
         sys.exit(f"{args.out} 已經存在，不覆寫（確定要覆寫再加 --force）")
     data = json.loads(args.results.read_text(encoding="utf-8"))
+    md = args.pack.read_text(encoding="utf-8")
+    # 簽章由盲評表的項目算出；不符代表 JSON 不是這份表匯出的，逐列填回會錯位
+    sig = signature(parse_pack(md))
+    if not data.get("sig"):
+        print("注意：JSON 沒有簽章，無法確認是這份盲評表匯出的", file=sys.stderr)
+    elif data["sig"] != sig:
+        sys.exit(f"JSON 的簽章 {data['sig']} 和 {args.pack.name} 的 {sig} 不同，"
+                 "不是同一份盲評表，沒有寫入")
     if data.get("source") != args.pack.name:
         print(f"注意：JSON 來源是 {data.get('source')}，不是 {args.pack.name}", file=sys.stderr)
-    text, conflicts = fill(args.pack.read_text(encoding="utf-8"), data)
+    text, conflicts = fill(md, data)
     args.out.write_text(text, encoding="utf-8")
     for c in conflicts:
         print("沒覆寫：" + c, file=sys.stderr)

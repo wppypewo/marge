@@ -7,6 +7,7 @@
 #   ../marge/tools/report/sync_drive.sh 測試計畫.pdf 模型輸出_補測_dots.md
 #
 # 雲端資料夾預設用 glob 找；找不到或找到多個時，用 MARGE_DRIVE_DIR 指定。
+# 雲端檔案比本機新、內容又不同時，一個都不寫並結束（結束碼 3）；確認後用 MARGE_FORCE=1 重跑。
 #
 # 過去踩過的坑（見 local-first-ai/TASKS.md）：
 #   - 10-17、10-18、10-23 三次 Google Drive 電腦版沒在執行，檔案寫進掛載點卻沒上傳。
@@ -43,15 +44,30 @@ if ! pgrep -q -f "Google Drive.app/Contents/MacOS/Google Drive"; then
   pgrep -q -f "Google Drive.app/Contents/MacOS/Google Drive" || { echo "啟動失敗" >&2; exit 1; }
 fi
 
-# 3. 寫入前的雲端現況；修改時間比本機新的檔案要先問使用者（可能被人改過）
+# 3. 寫入前的雲端現況
 echo "== 寫入前"
 ls -lT "$dir"
 [ "${1:-}" = "--check" ] && exit 0
 [ $# -ge 1 ] || { echo "用法：$0 檔案…（或 --check）" >&2; exit 2; }
 
-# 4. 逐檔覆寫並逐位元比對
+# 4. 全部檢查完才開始寫：雲端檔比本機新、內容又不同，可能被人改過或存回舊版，先停下來問使用者
+#    （cat > 覆寫後雲端時間一定比本機新，所以只看時間不夠，要再比內容）
+newer=()
 for f in "$@"; do
   [ -f "$f" ] || { echo "找不到本機檔案：$f" >&2; exit 1; }
+  target="$dir/$(basename "$f")"
+  if [ -f "$target" ] && [ "$target" -nt "$f" ] && ! cmp -s "$f" "$target"; then
+    newer+=("$(basename "$f")")
+  fi
+done
+if [ ${#newer[@]} -gt 0 ] && [ "${MARGE_FORCE:-}" != 1 ]; then
+  echo "雲端這些檔案比本機新、內容不同，可能被人改過：${newer[*]}" >&2
+  echo "一個都沒寫入。確認要用本機版覆寫，再用 MARGE_FORCE=1 重跑。" >&2
+  exit 3
+fi
+
+# 5. 逐檔覆寫並逐位元比對
+for f in "$@"; do
   target="$dir/$(basename "$f")"
   cat "$f" > "$target"
   cmp "$f" "$target"
