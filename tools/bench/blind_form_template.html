@@ -161,11 +161,20 @@ function blank() {
   }
   return s;
 }
+const SIG_KEY = KEY + ":sig";
 let S = blank();
 let canSave = true;
+let loadNote = "";
 try {
   const raw = localStorage.getItem(KEY);
-  if (raw) S = merge(blank(), JSON.parse(raw));
+  const savedSig = localStorage.getItem(SIG_KEY);
+  if (raw && savedSig && savedSig !== D.sig) {
+    // 同檔名、同一天重產的盲評表項目不同：舊內容另存，不依序號套到新項目上
+    localStorage.setItem(KEY + ":old:" + savedSig, raw);
+    loadNote = "這個瀏覽器存的舊內容和這份盲評表的項目對不上，沒有帶入（舊內容另存在 localStorage 的「" + KEY + ":old:" + savedSig + "」）";
+  } else if (raw) {
+    S = merge(blank(), JSON.parse(raw));
+  }
 } catch (e) { canSave = false; }
 
 // 存檔內容的項目數和目前表單不一致時，只帶入對得上的部分
@@ -174,10 +183,18 @@ function merge(base, saved) {
     const b = base[L], s = saved && saved[L];
     if (!s) continue;
     for (const k of ["warn", "silent", "marks"]) {
-      (s[k] || []).forEach((v, i) => { if (b[k][i]) Object.assign(b[k][i], v); });
+      (Array.isArray(s[k]) ? s[k] : []).forEach((v, i) => {
+        if (!b[k][i] || !v || typeof v !== "object") return;
+        Object.assign(b[k][i], v);
+        // 格式不對的 errs 會讓畫面整個停住，退回空陣列
+        if (k !== "marks" && !Array.isArray(b[k][i].errs)) b[k][i].errs = [];
+      });
     }
-    for (const k of ["wrong", "level", "b1keep", "b1err", "b2keep", "b2err", "format"]) {
-      if (s[k] !== undefined) b[k] = s[k];
+    for (const k of ["wrong", "level", "b1err", "b2err", "format"]) {
+      if (typeof s[k] === "string") b[k] = s[k];
+    }
+    for (const k of ["b1keep", "b2keep"]) {
+      if (typeof s[k] === "string" || s[k] === null) b[k] = s[k];
     }
   }
   return base;
@@ -189,7 +206,9 @@ function save() {
   if (!canSave) { el.textContent = "這個瀏覽器不能自動儲存，填完請按「匯出 JSON」"; el.classList.add("warn"); return; }
   try {
     localStorage.setItem(KEY, JSON.stringify(S));
-    el.textContent = "已自動儲存在這個瀏覽器";
+    localStorage.setItem(SIG_KEY, D.sig);
+    el.textContent = loadNote ? loadNote + "；之後填的內容照常自動儲存" : "已自動儲存在這個瀏覽器";
+    if (loadNote) el.classList.add("warn");
   } catch (e) {
     canSave = false;
     el.textContent = "自動儲存失敗，填完請按「匯出 JSON」";
@@ -498,14 +517,19 @@ document.getElementById("importFile").addEventListener("change", ev => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    try {
-      const data = JSON.parse(reader.result);
-      if (data.sig !== D.sig && !confirm("這個 JSON 不是從這份盲評表匯出的，項目可能對不上。還是要匯入嗎？")) return;
-      if (!confirm("匯入會取代這個瀏覽器裡目前填的內容，確定嗎？")) return;
-      S = merge(blank(), data.state);
-      save(); render();
-    } catch (e) { alert("讀不到這個檔案：" + e.message); }
+    // 先清掉選取，取消匯入後再選同一個檔也會觸發 change
     ev.target.value = "";
+    let data;
+    try { data = JSON.parse(reader.result); } catch (e) { alert("讀不到這個檔案：" + e.message); return; }
+    const state = data && data.state;
+    if (!state || typeof state !== "object" || !D.models.some(m => state[m.letter])) {
+      alert("這個 JSON 裡沒有這份盲評表的填寫內容（state），沒有匯入");
+      return;
+    }
+    if (data.sig !== D.sig && !confirm("這個 JSON 不是從這份盲評表匯出的，項目可能對不上。還是要匯入嗎？")) return;
+    if (!confirm("匯入會取代這個瀏覽器裡目前填的內容，確定嗎？")) return;
+    S = merge(blank(), state);
+    save(); render();
   };
   reader.readAsText(file);
 });
