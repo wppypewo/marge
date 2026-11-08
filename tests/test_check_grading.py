@@ -73,11 +73,10 @@ class TestOptimizedText(unittest.TestCase):
         n, _ = self.字數(["Une deux trois.", "---"])
         self.assertEqual(n, 3)
 
-    def test_法文冒號前的空格照舊算一個token(self):
-        # 和學生原文的算法一致；要不要改是方法上的決定，不在這裡改
+    def test_法文冒號前的空格不把冒號算成字(self):
+        # ADR-012：只有標點的 token 不算字
         n, _ = self.字數(["Il y a deux raisons : la première."])
-        # Il y a deux raisons : la première. → 冒號單獨算 1，共 8
-        self.assertEqual(n, 8)
+        self.assertEqual(n, 7)
 
     def test_自報字數可帶粗體或斜體(self):
         for line in ("(129 mots)", "*(129 mots)*", "**(129 mots)**"):
@@ -90,7 +89,22 @@ class TestOptimizedText(unittest.TestCase):
                  "(9 mots)",
                  "Souhaitez-vous un autre exercice ?"]
         n, self_count = self.字數(lines)
-        self.assertEqual((n, self_count), (9, 9))
+        # 本文 8 個字（「?」獨立不算，ADR-012）；模型自報的 9 原樣取出
+        self.assertEqual((n, self_count), (8, 9))
+
+
+class TestCountWords(unittest.TestCase):
+
+    def test_法文排版的獨立標點不算字(self):
+        text = "Pourquoi ? Parce que : « oui » ; enfin !"
+        self.assertEqual(cg.count_words(text), (5, 5))
+
+    def test_黏在字上的標點與撇號規則不變(self):
+        # 「l'idole,」仍是空白分隔 1 個字、撇號拆開 2 個
+        self.assertEqual(cg.count_words("l'idole, c'est 2026."), (3, 5))
+
+    def test_單獨的撇號或破折號不算字(self):
+        self.assertEqual(cg.count_words("un – deux ' trois"), (3, 3))
 
 
 if __name__ == "__main__":

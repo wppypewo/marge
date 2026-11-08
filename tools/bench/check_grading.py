@@ -271,7 +271,7 @@ def strip_markup(line):
 
     模型會在優化版本裡沿用標記（例如「**☑️ D'une part**」「raisonnable ☑️,」），
     以空白切字時「**☑️」「☑️,」會各算一個字。沒有標記的純標點 token
-    （法文冒號前的空格造成的「:」）不動，和學生原文的算法一致。
+    （法文冒號前的空格造成的「:」）在這裡不動，由 count_words 排除。
     """
     kept = []
     for token in line.split():
