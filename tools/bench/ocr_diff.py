@@ -28,6 +28,9 @@ REFERENCE = EVIDENCE / "參考轉寫_IMG_2968.md"
 # 模型常把撇號、引號換成印刷體，這不算 OCR 錯誤，比對前先統一
 QUOTE_MAP = str.maketrans({"’": "'", "‘": "'", "ʼ": "'"})
 
+# 至少含一個字母或數字（\w 涵蓋法文重音字母）才算字
+WORDISH = re.compile(r"\w")
+
 
 def normalize(text):
     """統一 Unicode 組合方式與撇號。"""
@@ -44,9 +47,15 @@ def load_reference():
 
 
 def count_words(text):
-    """回傳（空白分隔字數, 撇號也拆開的字數），規則和參考轉寫檔相同。"""
-    tokens = normalize(text).split()
-    split_apostrophe = sum(len([p for p in t.split("'") if p]) for t in tokens)
+    """回傳（空白分隔字數, 撇號也拆開的字數）。
+
+    沒有任何字母或數字的 token 不算字：法文在 : ; ? ! « » 前後加空格，
+    以空白切開時這些標點會單獨成為 token，算進去會讓用標準法文排版的
+    文字多出好幾個「字」（見 PRD ADR-012）。
+    """
+    tokens = [t for t in normalize(text).split() if WORDISH.search(t)]
+    split_apostrophe = sum(
+        len([p for p in t.split("'") if WORDISH.search(p)]) for t in tokens)
     return len(tokens), split_apostrophe
 
 
