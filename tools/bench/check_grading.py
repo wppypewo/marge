@@ -51,16 +51,32 @@ OPTIMIZED_RANGE = (120, 140)
 # 模型在優化版本後面自己報的字數，例如「(129 mots)」
 SELF_COUNT = re.compile(r"^\(\s*(\d+)\s*mots\s*\)$")
 
+# 標題後面接冒號、內容寫在同一行，例如「- 字數統計 : Le texte compte…」
+# 「以 B1 檢定為目標的優化版本（120-140字） : 」。冒號前可夾一段括號說明與粗體記號。
+INLINE_HEADING = re.compile(
+    r"^\s*(?:\*\*)?\s*(?:[（(][^）)]*[）)])?\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?\s*")
 
-def heading_key(line):
-    """如果這一行是標題，回傳它的代號；不是就回傳 None。"""
+# Markdown 分隔線（---、***、___）
+RULE_LINE = re.compile(r"^[-*_]{3,}$")
+
+
+def parse_heading(line):
+    """如果這一行是標題，回傳（代號, 同一行標題後面的內容）；不是就回傳（None, None）。
+
+    標題後面有冒號時不限長度，冒號後的文字歸進該段；
+    沒有冒號時照舊只認 40 字元以內的行，避免把以「優點」開頭的句子當成標題。
+    """
     stripped = line.strip().lstrip("-•#* ").strip()
-    if len(stripped) > 40:
-        return None
     for key, title in HEADINGS:
-        if stripped.startswith(title):
-            return key
-    return None
+        if not stripped.startswith(title):
+            continue
+        rest = stripped[len(title):]
+        sep = INLINE_HEADING.match(rest)
+        if sep:
+            return key, rest[sep.end():].strip()
+        if len(stripped) <= 40:
+            return key, ""
+    return None, None
 
 
 def split_sections(text):
@@ -68,7 +84,7 @@ def split_sections(text):
     sections = {}
     current = None
     for line in text.splitlines():
-        key = heading_key(line)
+        key, inline = parse_heading(line)
         if key == "annotated" and current is None:
             current = key
         elif current is None:
@@ -79,6 +95,8 @@ def split_sections(text):
             sections.setdefault(current, []).append(line)
         else:
             sections.setdefault(current, [])
+            if inline:
+                sections[current].append(inline)
     return sections
 
 
@@ -248,21 +266,44 @@ def check_count_section(lines, student_words):
         print("  沒有照範本寫「Plus de … mots écrits」「Il manque … mots」或「Le texte compte … mots」")
 
 
+def strip_markup(line):
+    """去掉 ⚠️／☑️／✅ 與 Markdown 粗體、斜體記號；只剩標點的 token 一併去掉。
+
+    模型會在優化版本裡沿用標記（例如「**☑️ D'une part**」「raisonnable ☑️,」），
+    以空白切字時「**☑️」「☑️,」會各算一個字。沒有標記的純標點 token
+    （法文冒號前的空格造成的「:」）不動，和學生原文的算法一致。
+    """
+    kept = []
+    for token in line.split():
+        if "*" in token or ANY_MARK.search(token):
+            token = ANY_MARK.sub("", token).replace("*", "")
+            if not re.search(r"\w", token):
+                continue
+        kept.append(token)
+    return " ".join(kept)
+
+
 def optimized_text(lines):
-    """去掉空行、模型自報字數的行、結尾的提問。"""
+    """去掉空行、分隔線、模型自報字數的行、結尾的提問與標記。
+
+    提問只去掉段落最後面的（模型問要不要繼續練習），
+    作文本文裡以問號結尾的段落照算。
+    """
     kept = []
     self_count = None
     for line in lines:
         stripped = line.strip()
-        if not stripped:
+        if not stripped or RULE_LINE.match(stripped):
             continue
-        found = SELF_COUNT.match(stripped)
+        found = SELF_COUNT.match(stripped.strip("*_ "))
         if found:
             self_count = int(found.group(1))
             continue
-        if stripped.endswith("?"):
-            continue
-        kept.append(stripped)
+        cleaned = strip_markup(stripped)
+        if cleaned:
+            kept.append(cleaned)
+    while kept and kept[-1].endswith("?"):
+        kept.pop()
     return " ".join(kept), self_count
 
 
