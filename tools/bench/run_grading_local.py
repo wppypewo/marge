@@ -15,11 +15,13 @@
 輸出：
     --out 指定的純文字檔，格式和 回覆_第二輪_*.txt 相同（第一則回覆、OCR、批閱），
     可以直接給 check_grading.py；另存同名 .json，放計時、token 數和思考內容。
+    中途失敗（逾時、伺服器錯誤、Ctrl-C）時不寫 .txt，已完成的輪次存到同名 .partial.json。
 """
 
 import argparse
 import base64
 import json
+import mimetypes
 import os
 import re
 import sys
@@ -49,9 +51,15 @@ def load_prompt(section):
     return m.group(1).rstrip("\n")
 
 
+def image_mime(path):
+    """依副檔名判斷圖片 MIME；不是圖片回傳 None。"""
+    mime, _ = mimetypes.guess_type(path.name)
+    return mime if mime and mime.startswith("image/") else None
+
+
 def image_part(path):
     data = base64.b64encode(path.read_bytes()).decode()
-    mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    mime = image_mime(path)
     return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{data}"}}
 
 
@@ -80,6 +88,10 @@ def stream_chat(base_url, model, messages, thinking, max_tokens, timeout):
             if not line.startswith("data: ") or line == "data: [DONE]":
                 continue
             chunk = json.loads(line[6:])
+            # llama-server 生成途中出錯時會在串流裡送 {"error": …}，之後就結束；
+            # 不擋下來的話，半截回答會被當成正常結果寫出去
+            if chunk.get("error"):
+                raise RuntimeError(f"伺服器在串流中回報錯誤：{chunk['error']}")
             usage = chunk.get("usage") or usage
             timings = chunk.get("timings") or timings
             for c in chunk.get("choices", []):
@@ -113,6 +125,11 @@ def main():
     p.add_argument("--timeout", type=int, default=3600, help="單則逾時秒數")
     p.add_argument("--out", type=Path, required=True)
     args = p.parse_args()
+    meta_path = args.out.with_suffix(".json")
+    if meta_path == args.out:
+        p.error("--out 不能是 .json：同名 .json 用來放計時與 token 數，會被覆蓋")
+    if image_mime(args.image) is None:
+        p.error(f"--image 看不出是圖片：{args.image.name}")
 
     turns = [
         load_prompt(args.section),
@@ -120,16 +137,31 @@ def main():
         load_reference(),
     ]
     messages, results = [], []
-    for i, content in enumerate(turns, 1):
-        messages.append({"role": "user", "content": content})
-        print(f"第 {i} 則送出……", file=sys.stderr, flush=True)
-        r = stream_chat(args.base_url, args.model, messages, args.thinking,
-                        args.max_tokens, args.timeout)
-        print(f"  {r['seconds']} 秒，結束原因 {r['finish_reason']}，usage {r['usage']}",
-              file=sys.stderr, flush=True)
-        # 下一則只帶回答，不帶思考內容
-        messages.append({"role": "assistant", "content": r["answer"]})
-        results.append(r)
+    meta = {
+        "label": args.label, "thinking": args.thinking, "sampling": SAMPLING[args.thinking],
+        "section": args.section, "image": args.image.name, "max_tokens": args.max_tokens,
+        "turns": results,
+    }
+    try:
+        for i, content in enumerate(turns, 1):
+            messages.append({"role": "user", "content": content})
+            print(f"第 {i} 則送出……", file=sys.stderr, flush=True)
+            r = stream_chat(args.base_url, args.model, messages, args.thinking,
+                            args.max_tokens, args.timeout)
+            print(f"  {r['seconds']} 秒，結束原因 {r['finish_reason']}，usage {r['usage']}",
+                  file=sys.stderr, flush=True)
+            # 下一則只帶回答，不帶思考內容
+            messages.append({"role": "assistant", "content": r["answer"]})
+            results.append(r)
+    except (OSError, RuntimeError, ValueError, KeyboardInterrupt) as e:
+        # OSError 含 URLError、HTTPError、逾時；ValueError 含 JSON 解析失敗
+        # 一則可能跑幾十分鐘，失敗時把已完成的輪次留下來，不必整組重跑才看得到
+        partial = args.out.with_suffix(".partial.json")
+        meta.update(complete=False, error=f"第 {len(results) + 1} 則：{type(e).__name__}: {e}")
+        partial.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"失敗：{meta['error']}\n已完成 {len(results)} 則，存到 {partial}；沒有寫 {args.out.name}",
+              file=sys.stderr)
+        sys.exit(1)
 
     secs = "、".join(f"第{i}則 {r['seconds']} 秒" for i, r in enumerate(results, 1))
     header = [
@@ -141,14 +173,14 @@ def main():
     ]
     body = "\n\n".join(r["answer"] for r in results)
     args.out.write_text("\n".join(header) + body + "\n", encoding="utf-8")
-    meta = {
-        "label": args.label, "thinking": args.thinking, "sampling": SAMPLING[args.thinking],
-        "section": args.section, "image": args.image.name, "max_tokens": args.max_tokens,
-        "turns": results,
-    }
-    args.out.with_suffix(".json").write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"已寫入 {args.out} 與 {args.out.with_suffix('.json').name}", file=sys.stderr)
+    meta["complete"] = True
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"已寫入 {args.out} 與 {meta_path.name}", file=sys.stderr)
+    # 被 max_tokens 截斷的回覆照樣寫出（可以看到截在哪），但要明講，免得當成完整批閱計分
+    for i, r in enumerate(results, 1):
+        if r["finish_reason"] == "length":
+            print(f"警告：第 {i} 則被 --max-tokens {args.max_tokens} 截斷，回覆不完整",
+                  file=sys.stderr)
 
 
 if __name__ == "__main__":
