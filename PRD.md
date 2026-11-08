@@ -117,6 +117,7 @@
 | 10-21 | 老師建議 NVIDIA NIM，轉來十家免費 API 清單 |
 | 10-23 | 補測 dots；盤點十家免費 API；報告更新為 24 頁 |
 | 10-24 | 老師建議建治理文件；建立 Marge 與本 PRD |
+| 11-06 | 本機 Qwen3.6 實測修正版 prompt 兩次（OI-2，只有本機）；D1～D4 決策備忘錄 |
 
 ## 6. Open issues
 
@@ -125,7 +126,7 @@
 | 編號 | 問題 | 影響 | 下一步 |
 |---|---|---|---|
 | OI-1 | Cerebras、Cloudflare 沒實測：品質、Open Minis 能不能接、Cerebras 每分鐘上限會不會擋 | D1 | 實測，流程同報告 2.3 |
-| OI-2 | 修正版 prompt（字數句、轉錄不修正）沒實測 | F2、F4 | 跑一次，和原版比 |
+| OI-2 | 修正版 prompt（字數句、轉錄不修正）只在本機 Qwen 測過：字數句兩次對一次，「轉錄不修正」沒效（仍改 4～5 個拼法）。見 `../local-first-ai/OI-2_修正版prompt_本機Qwen_2026-11-06.md` | F2、F4 | 雲端模型（Nemotron、Cerebras）各跑一次，和原版比 |
 | OI-3 | 每個雲端模型只跑一次，重跑差多少不知道 | F11 | 同一模型跑兩次 |
 | OI-4 | iPhone 的 Open Minis 掛不上 Google Drive | D2、D4 | 問老師能不能改用 iCloud Drive，或找其他 App |
 | OI-5 | Android 沒測（作者沒有 Android 裝置） | D2 | 先問老師學生用什麼手機 |
