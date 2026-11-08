@@ -71,6 +71,7 @@ def stream_chat(base_url, model, prompt, api_key, max_tokens, timeout):
     usage = None
     chunks = 0
     first = None
+    done = False
     start = time.monotonic()
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         for raw in resp:
@@ -80,6 +81,7 @@ def stream_chat(base_url, model, prompt, api_key, max_tokens, timeout):
                 continue
             data = line[len("data:"):].strip()
             if data == "[DONE]":
+                done = True
                 break
             event = json.loads(data)
             if event.get("error"):
@@ -100,6 +102,10 @@ def stream_chat(base_url, model, prompt, api_key, max_tokens, timeout):
                 if text:
                     content.append(text)
     end = time.monotonic()
+    # 伺服器提早關閉連線時，迴圈也會正常結束，但回答只到一半；
+    # 這種截斷的結果不能拿去評分或算速度，所以當成這題失敗
+    if not done:
+        raise RuntimeError("串流在收到 [DONE] 前就結束，回答可能不完整")
 
     if usage and usage.get("completion_tokens"):
         tokens, source = usage["completion_tokens"], "API"
