@@ -33,7 +33,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
-        payload = {"BADJSON": b"data: {broken\n\n", "BADUTF8": b"data: \xff\xfe\n\n"}.get(prompt, OK)
+        payload = {
+            "BADJSON": b"data: {broken\n\n",
+            "BADUTF8": b"data: \xff\xfe\n\n",
+            # 有內容但沒有 [DONE]：伺服器中途收尾，回答被截斷
+            "NODONE": b'data: {"choices":[{"delta":{"content":"half"}}]}\n\n',
+        }.get(prompt, OK)
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         if prompt == "SLOW":
@@ -78,6 +83,18 @@ class RunBenchTest(unittest.TestCase):
         self.assertEqual([bool(row["錯誤"]) for row in rows], [False, True, True, True, False])
         md = next((self.dir / "out").glob("*.md")).read_text(encoding="utf-8")
         self.assertIn("## T5 OK", md)
+
+    def test_stream_without_done_is_marked_failed(self):
+        r = subprocess.run(self.args(["OK", "NODONE", "OK"]),
+                           capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        rows = self.rows()
+        self.assertEqual([row["題號"] for row in rows], ["T1", "T2", "T3"])
+        self.assertEqual([bool(row["錯誤"]) for row in rows], [False, True, False])
+        self.assertIn("[DONE]", rows[1]["錯誤"])
+        # 截斷的回答不能出現在報告的回答欄位裡被當成正常結果
+        md = next((self.dir / "out").glob("*.md")).read_text(encoding="utf-8")
+        self.assertNotIn("half", md)
 
     def test_ctrl_c_keeps_finished_tests(self):
         p = subprocess.Popen(self.args(["OK", "SLOW", "OK"]),
