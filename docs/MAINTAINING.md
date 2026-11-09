@@ -36,6 +36,8 @@
 
 - `MARGE_EVIDENCE`：評測證據目錄，預設 `../local-first-ai`。`ocr_diff.py` 從這裡讀參考轉寫，`run_grading_local.py` 從這裡讀 prompt 與照片。
 - `MARGE_DRIVE_DIR`：雲端資料夾的掛載路徑。`sync_drive.sh` 預設用 glob 找，找到 0 個或多個時才要設。
+- `MARGE_SYNC_STATE`：`sync_drive.sh` 記錄每個雲端檔案上次寫入內容 SHA-256 的檔案，預設 `~/.local/state/marge/sync_drive.tsv`。雲端內容和這裡的紀錄不同就視為被人改過，不寫入。
+- `MARGE_FORCE=1`：確認雲端的修改可以蓋掉時才設。第一次用雜湊版、還沒有紀錄的檔案內容不同時，也要設一次。
 
 ## 更新 PRD 的規則
 

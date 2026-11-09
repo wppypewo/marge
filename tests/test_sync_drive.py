@@ -5,6 +5,7 @@
 和假的 open（被呼叫就失敗），所以不會碰到真的 Google Drive。
 """
 
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -27,7 +28,9 @@ class TestSyncDrive(unittest.TestCase):
         (bin_dir / "open").write_text("#!/bin/sh\necho 不該啟動 Google Drive >&2\nexit 1\n")
         for f in bin_dir.iterdir():
             f.chmod(0o755)
+        self.state = root / "state" / "sync_drive.tsv"
         self.env = {**os.environ, "MARGE_DRIVE_DIR": str(self.drive),
+                    "MARGE_SYNC_STATE": str(self.state),
                     "PATH": f"{bin_dir}:{os.environ['PATH']}"}
         self.env.pop("MARGE_FORCE", None)
 
@@ -75,12 +78,41 @@ class TestSyncDrive(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.cloud("n.md"), "新檔")
 
-    def test_本機較新照常覆寫(self):
-        self.put("a.md", local="本機新版", cloud="舊", cloud_newer=False)
+    def test_上次同步後只有本機改過就照常覆寫(self):
+        self.put("a.md", local="第一版")
+        self.assertEqual(self.sync("a.md").returncode, 0)
+        self.put("a.md", local="本機新版")
         r = self.sync("a.md")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.cloud("a.md"), "本機新版")
         self.assertIn("OK a.md", r.stdout)
+
+    def test_雲端被改過但本機時間較新也不寫(self):
+        # 舊做法只看時間：本機在雲端被改之後才編輯，就會蓋掉別人的修改
+        self.put("a.md", local="第一版")
+        self.assertEqual(self.sync("a.md").returncode, 0)
+        self.put("a.md", local="本機新版", cloud="老師改過", cloud_newer=False)
+        r = self.sync("a.md")
+        self.assertEqual(r.returncode, 3, r.stderr)
+        self.assertEqual(self.cloud("a.md"), "老師改過")
+
+    def test_沒有同步紀錄且內容不同時先停下(self):
+        self.put("a.md", local="本機新版", cloud="舊", cloud_newer=False)
+        r = self.sync("a.md")
+        self.assertEqual(r.returncode, 3, r.stderr)
+        self.assertEqual(self.cloud("a.md"), "舊")
+        self.assertFalse(self.state.exists())
+
+    def test_寫入後記下雜湊且同一檔只留一筆(self):
+        self.put("a.md", local="一")
+        self.sync("a.md")
+        self.put("a.md", local="二")
+        self.sync("a.md")
+        lines = self.state.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(lines), 1)
+        digest, path = lines[0].split("\t")
+        self.assertEqual(digest, hashlib.sha256("二".encode("utf-8")).hexdigest())
+        self.assertEqual(path, str(self.drive / "a.md"))
 
     def test_check只列出不寫(self):
         self.put("a.md", local="本機新版", cloud="舊", cloud_newer=False)

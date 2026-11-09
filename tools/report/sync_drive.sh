@@ -7,7 +7,10 @@
 #   ../marge/tools/report/sync_drive.sh 測試計畫.pdf 模型輸出_補測_dots.md
 #
 # 雲端資料夾預設用 glob 找；找不到或找到多個時，用 MARGE_DRIVE_DIR 指定。
-# 雲端檔案比本機新、內容又不同時，一個都不寫並結束（結束碼 3）；確認後用 MARGE_FORCE=1 重跑。
+# 每次寫入成功後，把內容的 SHA-256 記在本機狀態檔（MARGE_SYNC_STATE，預設
+# ~/.local/state/marge/sync_drive.tsv）。下次同步時，雲端內容和本機不同，而且
+# 雲端雜湊也不是上次記下的值，就代表雲端被人改過：一個都不寫並結束（結束碼 3）；
+# 確認後用 MARGE_FORCE=1 重跑。沒有紀錄的檔案（第一次用這版）內容不同時也一樣先停下。
 #
 # 過去踩過的坑（見 local-first-ai/TASKS.md）：
 #   - 10-17、10-18、10-23 三次 Google Drive 電腦版沒在執行，檔案寫進掛載點卻沒上傳。
@@ -50,27 +53,44 @@ ls -lT "$dir"
 [ "${1:-}" = "--check" ] && exit 0
 [ $# -ge 1 ] || { echo "用法：$0 檔案…（或 --check）" >&2; exit 2; }
 
-# 4. 全部檢查完才開始寫：雲端檔比本機新、內容又不同，可能被人改過或存回舊版，先停下來問使用者
-#    （cat > 覆寫後雲端時間一定比本機新，所以只看時間不夠，要再比內容）
+# 4. 全部檢查完才開始寫。判斷「雲端有沒有被人改過」只看內容雜湊，不看修改時間：
+#    本機檔在雲端被改之後才編輯，本機時間會比較新，舊做法會直接蓋掉別人的修改；
+#    Google Drive 存回舊版時，修改時間也不一定反映內容。
+state=${MARGE_SYNC_STATE:-$HOME/.local/state/marge/sync_drive.tsv}
+
+sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+
+# 狀態檔一行一筆：雜湊<TAB>雲端檔案絕對路徑
+recorded() {
+  [ -f "$state" ] || return 0
+  awk -F'\t' -v p="$1" '$2 == p { h = $1 } END { if (h != "") print h }' "$state"
+}
+
 newer=()
 for f in "$@"; do
   [ -f "$f" ] || { echo "找不到本機檔案：$f" >&2; exit 1; }
   target="$dir/$(basename "$f")"
-  if [ -f "$target" ] && [ "$target" -nt "$f" ] && ! cmp -s "$f" "$target"; then
+  if [ -f "$target" ] && ! cmp -s "$f" "$target" && [ "$(sha "$target")" != "$(recorded "$target")" ]; then
     newer+=("$(basename "$f")")
   fi
 done
 if [ ${#newer[@]} -gt 0 ] && [ "${MARGE_FORCE:-}" != 1 ]; then
-  echo "雲端這些檔案比本機新、內容不同，可能被人改過：${newer[*]}" >&2
+  echo "雲端這些檔案和上次同步的內容不同（或沒有同步紀錄），可能被人改過：${newer[*]}" >&2
   echo "一個都沒寫入。確認要用本機版覆寫，再用 MARGE_FORCE=1 重跑。" >&2
   exit 3
 fi
 
-# 5. 逐檔覆寫並逐位元比對
+# 5. 逐檔覆寫、逐位元比對，成功後更新狀態檔
+mkdir -p "$(dirname "$state")"
 for f in "$@"; do
   target="$dir/$(basename "$f")"
   cat "$f" > "$target"
   cmp "$f" "$target"
+  # 先寫暫存檔再改名，中途失敗不會留下半份狀態檔
+  tmp_state="$state.tmp.$$"
+  { [ -f "$state" ] && awk -F'\t' -v p="$target" '$2 != p' "$state"
+    printf '%s\t%s\n' "$(sha "$target")" "$target"; } > "$tmp_state"
+  mv "$tmp_state" "$state"
   echo "OK $(basename "$f")（$(stat -f %z "$f") bytes）"
 done
 
